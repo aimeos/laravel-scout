@@ -210,24 +210,30 @@ class DatabaseEngine extends Engine implements PaginatesEloquentModelsUsingDatab
 
             $likeOperator = $connectionType == 'pgsql' ? 'ilike' : 'like';
 
-            foreach ($columns as $column) {
-                if (in_array($column, $fullTextColumns)) {
-                    $query->orWhereFullText(
-                        $builder->model->qualifyColumn($column),
-                        $builder->query,
-                        $this->getFullTextOptions($builder)
-                    );
-                } else {
-                    if ($canSearchPrimaryKey && $column === $builder->model->getScoutKeyName()) {
-                        continue;
-                    }
+            if ($fullTextColumns) {
+                $cols = [];
 
-                    $query->orWhere(
-                        $builder->model->qualifyColumn($column),
-                        $likeOperator,
-                        in_array($column, $prefixColumns) ? $builder->query.'%' : '%'.$builder->query.'%',
-                    );
+                foreach ($fullTextColumns as $col) {
+                    $cols[] = $builder->model->qualifyColumn($col);
                 }
+
+                $query->orWhereFullText(
+                    $cols,
+                    $builder->query,
+                    $this->getFullTextOptions($builder)
+                );
+            }
+
+            foreach (array_diff($columns, $fullTextColumns) as $column) {
+                if ($canSearchPrimaryKey && $column === $builder->model->getScoutKeyName()) {
+                    continue;
+                }
+
+                $query->orWhere(
+                    $builder->model->qualifyColumn($column),
+                    $likeOperator,
+                    in_array($column, $prefixColumns) ? $builder->query.'%' : '%'.$builder->query.'%',
+                );
             }
         });
     }
